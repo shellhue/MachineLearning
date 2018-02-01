@@ -13,20 +13,31 @@ class Perception(object):
         self.weights = [0 for _ in range(input_dimention)]
         self.bias = 0
 
-    def train(self, inputs, labels, learning_rate):
+    def __str__(self):
+        return 'weights\t:%s\nbias\t%f' % (self.weights, self.bias)
+
+    def train(self, input_vecs, labels, iterations, learning_rate):
         '''
         训练
 
         :param inputs: 需要训练的数据
         :param labels: 数据标签
+        :param iterations: 循环次数
         :param learning_rate: 学习率
         :return: 没有返回值
         '''
+        for _ in range(iterations):
+            self._one_iteration(input_vecs, labels, learning_rate)
 
-        predicts = [self.predict(input) for input in inputs]
-        return
+    def _one_iteration(self, input_vecs, labels, learning_rate):
+        for (input_vec, label) in zip(input_vecs, labels):
+            output = self.predict(input_vec)
+            self._update_weights(input_vec, output, label, learning_rate)
 
-    def one_iteration(self, ):
+    def _update_weights(self, input_vec, output, label, learning_rate):
+        delta = label - output
+        self.weights = map(lambda item: item[1] + delta * item[0], zip(input_vec, self.weights))
+        self.bias += delta * learning_rate
 
     def predict(self, input):
         return self.activator(reduce(lambda a, b: a + b, map(lambda item: item[0] * item[1], zip(input, self.weights)), 0) + self.bias)
