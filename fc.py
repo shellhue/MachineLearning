@@ -31,3 +31,45 @@ class FullConnectedLayer(object):
     def update(self, learning_rate):
         self.w += learning_rate * self.w_grad
         self.b += learning_rate * self.b_grad
+
+class SigmoidActivator(object):
+    def forward(self, weighted_input):
+        return 1.0 / (1.0 + np.exp(-weighted_input))
+
+    def backward(self, output):
+        return output * (1.0 - output)
+
+class Network(object):
+    def __init__(self, layers):
+        self.layers = []
+        for i in range(layers.length - 1):
+            self.layers.append(FullConnectedLayer(layers[i], layers[i + 1], SigmoidActivator()))
+
+    def forward(self, input_vec):
+        for layer in self.layers:
+            layer.forward(input_vec)
+
+    def backward(self, label):
+        predict = self.layers[-1].output
+        delta = self.layers[-1].activator.backward(predict) * (label - predict)
+        for layer in self.layers[::-1]:
+            layer.backward(delta)
+            delta = layer.delta
+
+    def update(self, learning_rate):
+        for layer in self.layers:
+            layer.update(learning_rate)
+
+    def train(self, input_vecs, labels, learning_rate, iterations):
+        for _ in range(iterations):
+            for (input_vec, label) in zip(input_vecs, labels):
+                self.train_one_example(input_vec, label, learning_rate)
+
+    def train_one_example(self, input_vec, label, learning_rate):
+            self.forward(input_vec)
+            self.backward(label)
+            self.update(learning_rate)
+
+    def predict(self, input_vec):
+        self.forward(input_vec)
+        return self.layers[-1].output
