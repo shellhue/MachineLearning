@@ -20,7 +20,7 @@ class Perception(object):
         '''
         训练
 
-        :param inputs: 需要训练的数据
+        :param input_vecs: 需要训练的数据
         :param labels: 数据标签
         :param iterations: 循环次数
         :param learning_rate: 学习率
@@ -36,14 +36,44 @@ class Perception(object):
 
     def _update_weights(self, input_vec, output, label, learning_rate):
         delta = label - output
-        self.weights = map(lambda item: item[1] + delta * item[0], zip(input_vec, self.weights))
+        self.weights = list(map(lambda item: item[1] + delta * item[0] * learning_rate, list(zip(input_vec, self.weights))))
         self.bias += delta * learning_rate
 
     def predict(self, input):
-        return self.activator(reduce(lambda a, b: a + b, map(lambda item: item[0] * item[1], zip(input, self.weights)), 0) + self.bias)
+        return self.activator(reduce(lambda a, b: a + b, map(lambda item: item[0] * item[1], list(zip(input, self.weights))), 0) + self.bias)
 
 def f(x):
     return 1 if x > 0 else 0
 
-if __name__ == '__main__':
+def get_and_training_dataset():
+    data = [[0, 0], [0, 1], [1, 1], [1, 0]]
+    labels = [0, 0, 1, 0]
+    return data, labels
+
+def get_or_training_dataset():
+    data = [[0, 0], [0, 1], [1, 1], [1, 0]]
+    labels = [0, 1, 1, 1]
+    return data, labels
+
+def train_or_perception():
+    or_perception = Perception(2, f)
+    input_vecs, labels = get_or_training_dataset()
+    or_perception.train(input_vecs, labels, 100, 0.1)
+
+    return or_perception
+
+def train_and_perception():
     and_perception = Perception(2, f)
+    input_vects, labels = get_and_training_dataset()
+    and_perception.train(input_vects, labels, 100, 0.1)
+
+    return and_perception
+
+if __name__ == '__main__':
+    or_perception = train_or_perception()
+    print(or_perception)
+    print(or_perception.predict([0, 1]))
+    print(or_perception.predict([1, 1]))
+    print(or_perception.predict([0, 0]))
+    print(or_perception.predict([1, 0]))
+
