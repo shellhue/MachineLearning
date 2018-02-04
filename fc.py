@@ -60,16 +60,19 @@ class Network(object):
         for layer in self.layers:
             layer.update(learning_rate)
 
-    def train(self, input_vecs, labels, learning_rate, iterations):
-        for _ in range(iterations):
+    def train(self, input_vecs, labels, rate, epoch):
+        for _ in range(epoch):
             for (input_vec, label) in zip(input_vecs, labels):
-                self.train_one_example(input_vec, label, learning_rate)
+                self.train_one_example(input_vec, label, rate)
 
-    def train_one_example(self, input_vec, label, learning_rate):
+    def train_one_example(self, input_vec, label, rate):
             self.forward(input_vec)
             self.backward(label)
-            self.update(learning_rate)
+            self.update(rate)
 
     def predict(self, input_vec):
         self.forward(input_vec)
         return self.layers[-1].output
+
+def gradient_check(network, sample_feature, sample_label):
+    
