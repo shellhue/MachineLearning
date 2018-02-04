@@ -1,4 +1,5 @@
 import numpy as np
+from functools import reduce
 
 class FullConnectedLayer(object):
     def __init__(self, input_size, output_size, activator):
@@ -32,12 +33,14 @@ class FullConnectedLayer(object):
         self.w += learning_rate * self.w_grad
         self.b += learning_rate * self.b_grad
 
+
 class SigmoidActivator(object):
     def forward(self, weighted_input):
         return 1.0 / (1.0 + np.exp(-weighted_input))
 
     def backward(self, output):
         return output * (1.0 - output)
+
 
 class Network(object):
     def __init__(self, layers):
@@ -66,13 +69,33 @@ class Network(object):
                 self.train_one_example(input_vec, label, rate)
 
     def train_one_example(self, input_vec, label, rate):
-            self.forward(input_vec)
-            self.backward(label)
-            self.update(rate)
+        self.forward(input_vec)
+        self.backward(label)
+        self.update(rate)
 
     def predict(self, input_vec):
         self.forward(input_vec)
         return self.layers[-1].output
 
+
 def gradient_check(network, sample_feature, sample_label):
-    
+    layer_index = np.random.randint(0, network.layers.length)
+    layer = network.layers[layer_index]
+    network.forward(sample_feature)
+    network.backward(sample_label)
+
+    def network_error(predict, label):
+        minus = list(map(lambda item: item[0] - item[1], list(zip(label, predict))))
+        return reduce(lambda a, b: a + b, minus, 0)
+
+    epsilon = 0.0001
+    output_index = np.random.randint(0, layer.output_size)
+    input_index = np.random.randint(0, layer.input_size)
+    actual_gradient = layer.w_grad[output_index][input_index]
+
+    layer.w[output_index][input_index] += epsilon
+    error1 = network_error(network.predict(sample_feature), sample_label)
+    layer.w[output_index][input_index] -= epsilon * 2
+    error2 = network_error(network.predict(sample_feature), sample_label)
+    expected_gradient = (error1 - error2) / (2 * epsilon)
+    print('expected gradient: \t%f\nactual gradient:\t%f\n' % (expected_gradient, actual_gradient))
