@@ -12,13 +12,13 @@ class FullConnectedLayer(object):
         '''
         self.w = np.random.uniform(-0.1, 0.1, [output_size, input_size])
         self.w_grad = np.zeros([output_size, input_size])
-        self.b = np.zeros([output_size, 1])
-        self.b_grad = np.zeros([output_size, 1])
+        self.b = np.zeros(output_size)
+        self.b_grad = np.zeros(output_size)
         self.input_activator = input_activator
         self.output_activator = output_activator
-        self.output = np.zeros([output_size, 1])
-        self.delta = np.zeros([input_size, 1])
-        self.input = np.zeros([input_size, 1])
+        self.output = np.zeros(output_size)
+        self.delta = np.zeros(input_size)
+        self.input = np.zeros(input_size)
 
     def forward(self, input_array):
         self.input = input_array
@@ -27,7 +27,7 @@ class FullConnectedLayer(object):
 
     def backward(self, delta_array):
         self.delta = self.input_activator.backward(self.input) * np.dot(self.w.T, delta_array)
-        self.w_grad = np.dot(delta_array, self.input.T)
+        self.w_grad = np.dot(delta_array[:, None], self.input[None, :])
         self.b_grad = delta_array
 
     def update(self, learning_rate):
@@ -107,7 +107,7 @@ def single_fc_layer_gradient_check():
             layer.forward(input)
             error2 = error_fuction(layer.output)
             expected_gradient = (error1 - error2) / (2 * epsilon)
-            print('expected gradient: %f, actual: %f' % (expected_gradient, layer.w[i][j]))
+            print('expected gradient: %f, actual: %f' % (expected_gradient, layer.w_grad[i][j]))
 
 
 def gradient_check(network, sample_feature, sample_label):
@@ -134,9 +134,4 @@ def gradient_check(network, sample_feature, sample_label):
 
 
 if __name__ == '__main__':
-    a = np.array([1, 2, 3, 4, 4, 5]).reshape([3, 2])
-    b = np.array([1, 2, 3]).reshape([1, 3])
-    print(b.shape)
-    print(a.shape)
-    print(np.matmul(b, a))
-    # single_fc_layer_gradient_check()
+    single_fc_layer_gradient_check()
