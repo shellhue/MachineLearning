@@ -39,3 +39,4 @@ class ConvLayer(object):
 if __name__ == '__main__':
     print('hahaah')
     print(np)
+    
