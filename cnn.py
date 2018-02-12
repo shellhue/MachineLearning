@@ -1,4 +1,6 @@
 import numpy as np
+from fc import IdentityActivator, SigmoidActivator
+from math import floor
 
 
 class ConvLayer(object):
@@ -40,16 +42,17 @@ class ConvLayer(object):
         for c in range(self.filer_number):
             f = self.filters[c]
             conv(self.padded_input_array, self.output[c], f.get_weights(), f.get_bias(), self.stride)
-        element_wise_op(self.output, self.output_activator)
+        element_wise_op(self.output, self.output_activator.forward)
 
     def backward(self, sensitivity_array):
         expanded_sensitivity_array = self.expand_sensitivity_map(sensitivity_array)
         zp = (self.input_width - expanded_sensitivity_array.shape[2] + self.filter_width - 1) / 2
+        zp = int(floor(zp))
         padded_expanded_sensitivity_array = padding(expanded_sensitivity_array, zp)
         self.delta_array = np.zeros([self.input_channel, self.input_height, self.input_width])
 
         for f in range(self.filer_number):
-            flipped_filter_weights = np.array(map(lambda i: np.rot90(i, 2), self.filters[f].get_weights()))
+            flipped_filter_weights = np.array(list(map(lambda i: np.rot90(i, 2), self.filters[f].get_weights())))
             delta_array = np.zeros(self.delta_array.shape)
             for i in range(self.input_channel):
                 conv(padded_expanded_sensitivity_array[f], delta_array[i], flipped_filter_weights[i], 0, 1)
@@ -67,7 +70,6 @@ class ConvLayer(object):
         for f in range(self.filer_number):
             self.filters[f].update(learning_rate)
 
-
     def expand_sensitivity_map(self, sensitivity_array):
         height = self.calculate_output_size(self.input_height, self.filter_height, self.zero_padding, 1)
         width = self.calculate_output_size(self.input_width, self.filter_width, self.zero_padding, 1)
@@ -79,7 +81,7 @@ class ConvLayer(object):
 
     @staticmethod
     def calculate_output_size(input_size, filter_size, zero_padding, stride):
-        return (input_size + 2 * zero_padding - filter_size) / stride + 1
+        return int(floor((input_size + 2 * zero_padding - filter_size) / stride + 1))
 
 
 def padding(array, zero_padding):
@@ -145,8 +147,30 @@ class Filter(object):
         return self.b
 
 
+def check_single_cnn_gradient():
+    input_array = np.array([1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 2, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 6, 7, 7, 8, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 7, 8])
+    input_array = input_array.reshape([2, 5, 5])
+
+    error_function = lambda x: x.sum()
+
+    cnn = ConvLayer(5, 5, 2, 3, 3, 1, 0, 2, SigmoidActivator(), IdentityActivator(), 0.001)
+    cnn.forward(input_array)
+    delta_array = np.ones(cnn.output.shape)
+    cnn.backward(delta_array)
+    epsilon = 0.0001
+    for f in range(cnn.filer_number):
+        aFilter = cnn.filters[f]
+        for d in range(aFilter.w.shape[0]):
+            for i in range(aFilter.w.shape[1]):
+                for j in range(aFilter.w.shape[2]):
+                    aFilter.w[d][i][j] += epsilon
+                    cnn.forward(input_array)
+                    error1 = error_function(cnn.output)
+                    aFilter.w[d][i][j] -= epsilon * 2
+                    cnn.forward(input_array)
+                    error2 = error_function(cnn.output)
+                    expected_grad = (error1 - error2) / (2 * epsilon)
+                    print('expected grad: ', expected_grad, ' actual grad: ', aFilter.w_grad[d][i][j])
+
 if __name__ == '__main__':
-    m = np.array([[1, 2], [3, 4]])
-    m = np.rot90(m)
-    m = np.rot90(m)
-    print(m)
+    check_single_cnn_gradient()
