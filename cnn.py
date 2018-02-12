@@ -42,6 +42,41 @@ class ConvLayer(object):
             conv(self.padded_input_array, self.output[c], f.get_weights(), f.get_bias(), self.stride)
         element_wise_op(self.output, self.output_activator)
 
+    def backward(self, sensitivity_array):
+        expanded_sensitivity_array = self.expand_sensitivity_map(sensitivity_array)
+        zp = (self.input_width - expanded_sensitivity_array.shape[2] + self.filter_width - 1) / 2
+        padded_expanded_sensitivity_array = padding(expanded_sensitivity_array, zp)
+        self.delta_array = np.zeros([self.input_channel, self.input_height, self.input_width])
+
+        for f in range(self.filer_number):
+            flipped_filter_weights = np.array(map(lambda i: np.rot90(i, 2), self.filters[f].get_weights()))
+            delta_array = np.zeros(self.delta_array.shape)
+            for i in range(self.input_channel):
+                conv(padded_expanded_sensitivity_array[f], delta_array[i], flipped_filter_weights[i], 0, 1)
+            self.delta_array += delta_array
+        derivative_array = np.array(self.input_array)
+        element_wise_op(derivative_array, self.input_activator.backward)
+        self.delta_array *= derivative_array
+
+        for f in range(self.filer_number):
+            for i in range(self.input_channel):
+                conv(self.padded_input_array[i], self.filters[f].w_grad[i], expanded_sensitivity_array[f], 0, 1)
+            self.filters[f].b_grad = expanded_sensitivity_array[f].sum()
+
+    def update(self, learning_rate):
+        for f in range(self.filer_number):
+            self.filters[f].update(learning_rate)
+
+
+    def expand_sensitivity_map(self, sensitivity_array):
+        height = self.calculate_output_size(self.input_height, self.filter_height, self.zero_padding, 1)
+        width = self.calculate_output_size(self.input_width, self.filter_width, self.zero_padding, 1)
+        expanded_array = np.zeros([self.filer_number, height, width])
+        for i in range(self.output_height):
+            for j in range(self.output_width):
+                expanded_array[:, i * self.stride, j * self.stride] = sensitivity_array[:, i, j]
+        return expanded_array
+
     @staticmethod
     def calculate_output_size(input_size, filter_size, zero_padding, stride):
         return (input_size + 2 * zero_padding - filter_size) / stride + 1
@@ -71,10 +106,17 @@ def element_wise_op(array, op):
 
 
 def conv(input_array, output_array, filter_weights, filter_bias, stride):
+    reshaped_input_array = input_array.copy()
+    reshaped_filter_weights = filter_weights.copy()
+    if reshaped_filter_weights.ndim == 2:
+        reshaped_input_array = input_array[None, :]
+    if filter_weights.ndim == 2:
+        reshaped_filter_weights = filter_weights[None, :]
     for i in range(output_array.shape[0]):
         for j in range(output_array.shape[1]):
-            patched_input = get_patch(input_array, i, j, filter_weights.shape[1], filter_weights.shape[2], stride)
+            patched_input = get_patch(reshaped_input_array, i, j, reshaped_filter_weights.shape[1], reshaped_filter_weights.shape[2], stride)
             output_array[i, j] = (patched_input * filter_weights).sum() + filter_bias
+
 
 def get_patch(input_array, i, j, patch_height, patch_width, stride):
     start_i = i * stride
@@ -104,10 +146,7 @@ class Filter(object):
 
 
 if __name__ == '__main__':
-    a = np.random.uniform(-1e-4, 1e-4, [3, 1])
-    b = np.zeros([1, 5])
-    v = np.array([[0, 2], [2, 3]])
-    v = padding(v, 2)
-    g = np.array([[1, 2], [3, 4]])
-    print(element_wise_op(v, lambda x: 2 * x))
-    print(v)
+    m = np.array([[1, 2], [3, 4]])
+    m = np.rot90(m)
+    m = np.rot90(m)
+    print(m)
