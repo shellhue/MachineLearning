@@ -179,5 +179,57 @@ def check_cnn_gradient():
                         print('expected grad: ', expected_grad, ' actual grad: ', a_filter.w_grad[d][i][j])
 
 
+class MaxPoolingLayer(object):
+    def __init__(self, input_height, input_width, input_channel, filter_height, filter_width, stride):
+        self.input_height = input_height
+        self.input_width = input_width
+        self.input_channel = input_channel
+        self.filter_height = filter_height
+        self.filter_width = filter_width
+        self.stride = stride
+
+        self.output_height = int(floor((input_height - filter_height) / stride + 1))
+        self.output_width = int(floor((input_width - filter_width) / stride + 1))
+
+        self.output = np.zeros([input_channel, self.output_height, self.output_width])
+
+    def forward(self, input_array):
+        self.input_array = input_array
+        for d in range(self.input_channel):
+            for i in range(self.output_height):
+                for j in range(self.output_width):
+                    self.output[d, i, j] = get_patch(input_array, i, j,
+                                                     self.filter_height,
+                                                     self.filter_width,
+                                                     self.stride).max()
+
+    def backward(self, sensitivity_array):
+        self.delta_array = np.zeros([self.input_channel, self.input_height, self.input_width])
+        for d in range(self.input_channel):
+            for i in range(self.output_height):
+                for j in range(self.output_width):
+                    pathed_input_array = get_patch(self.input_array, i, j,
+                                                   self.filter_height,
+                                                   self.filter_width,
+                                                   self.stride)
+                    m, n = get_max_index(pathed_input_array)
+                    self.delta_array[d, i * self.stride + m, j * self.stride + n] = sensitivity_array[d, i, j]
+
+
+def get_max_index(input_array):
+    index_i = 0
+    index_j = 0
+    max_value = input_array[0, 0]
+    for i in range(input_array.shape[0]):
+        for j in range(input_array.shape[1]):
+            if input_array[i, j] > max_value:
+                max_value = input_array[i, j]
+                index_i = i
+                index_j = j
+    return index_i, index_j
+
+
 if __name__ == '__main__':
-    check_cnn_gradient()
+    a = np.array([[1, 3, 6, 78], [3, 89, 3, 5]])
+    i, j = get_max_index(a)
+    print(i, j)
