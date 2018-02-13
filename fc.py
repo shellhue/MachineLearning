@@ -1,6 +1,23 @@
 import numpy as np
 from functools import reduce
 
+
+class SigmoidActivator(object):
+    def forward(self, weighted_input):
+        return 1.0 / (1.0 + np.exp(-weighted_input))
+
+    def backward(self, output):
+        return output * (1.0 - output)
+
+
+class IdentityActivator(object):
+    def forward(self, weighted_input):
+        return np.array(weighted_input)
+
+    def backward(self, output):
+        return 1
+
+
 class FullConnectedLayer(object):
     def __init__(self, input_size, output_size, input_activator, output_activator):
         '''
@@ -33,21 +50,6 @@ class FullConnectedLayer(object):
     def update(self, learning_rate):
         self.w += learning_rate * self.w_grad
         self.b += learning_rate * self.b_grad
-
-class SigmoidActivator(object):
-    def forward(self, weighted_input):
-        return 1.0 / (1.0 + np.exp(-weighted_input))
-
-    def backward(self, output):
-        return output * (1.0 - output)
-
-
-class IdentityActivator(object):
-    def forward(self, weighted_input):
-        return np.array(weighted_input)
-
-    def backward(self, output):
-        return 1
 
 
 class Network(object):

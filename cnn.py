@@ -3,6 +3,64 @@ from fc import IdentityActivator, SigmoidActivator
 from math import floor
 
 
+def padding(array, zero_padding):
+    if array.ndim == 2:
+        height = array.shape[0]
+        width = array.shape[1]
+        padded__array = np.zeros([height + 2 * zero_padding,
+                                  width + 2 * zero_padding])
+        padded__array[zero_padding: zero_padding + height, zero_padding: zero_padding + width] = array
+        return padded__array
+    depth = array.shape[0]
+    height = array.shape[1]
+    width = array.shape[2]
+    padded__array = np.zeros([depth,
+                              height + 2 * zero_padding,
+                              width + 2 * zero_padding])
+    padded__array[:, zero_padding: zero_padding + height, zero_padding: zero_padding + width] = array
+    return padded__array
+
+
+def element_wise_op(array, op):
+    for i in np.nditer(array, op_flags=['readwrite']):
+        i[...] = op(i)
+
+
+def conv(input_array, output_array, filter_weights, filter_bias, stride):
+    reshaped_input_array = input_array.copy()
+    reshaped_filter_weights = filter_weights.copy()
+    if reshaped_filter_weights.ndim == 2:
+        reshaped_input_array = input_array[None, :]
+    if filter_weights.ndim == 2:
+        reshaped_filter_weights = filter_weights[None, :]
+    for i in range(output_array.shape[0]):
+        for j in range(output_array.shape[1]):
+            patched_input = get_patch(reshaped_input_array, i, j, reshaped_filter_weights.shape[1], reshaped_filter_weights.shape[2], stride)
+            output_array[i, j] = (patched_input * filter_weights).sum() + filter_bias
+
+
+def get_patch(input_array, i, j, patch_height, patch_width, stride):
+    start_i = i * stride
+    start_j = j * stride
+    if input_array.ndim == 2:
+        return input_array[start_i: start_i + patch_height, start_j: start_j + patch_width]
+    elif input_array.ndim == 3:
+        return input_array[:, start_i: start_i + patch_height, start_j: start_j + patch_width]
+
+
+def get_max_index(input_array):
+    index_i = 0
+    index_j = 0
+    max_value = input_array[0, 0]
+    for i in range(input_array.shape[0]):
+        for j in range(input_array.shape[1]):
+            if input_array[i, j] > max_value:
+                max_value = input_array[i, j]
+                index_i = i
+                index_j = j
+    return index_i, index_j
+
+
 class ConvLayer(object):
     def __init__(self,
                  input_width,
@@ -84,51 +142,6 @@ class ConvLayer(object):
         return int(floor((input_size + 2 * zero_padding - filter_size) / stride + 1))
 
 
-def padding(array, zero_padding):
-    if array.ndim == 2:
-        height = array.shape[0]
-        width = array.shape[1]
-        padded__array = np.zeros([height + 2 * zero_padding,
-                                  width + 2 * zero_padding])
-        padded__array[zero_padding: zero_padding + height, zero_padding: zero_padding + width] = array
-        return padded__array
-    depth = array.shape[0]
-    height = array.shape[1]
-    width = array.shape[2]
-    padded__array = np.zeros([depth,
-                              height + 2 * zero_padding,
-                              width + 2 * zero_padding])
-    padded__array[:, zero_padding: zero_padding + height, zero_padding: zero_padding + width] = array
-    return padded__array
-
-
-def element_wise_op(array, op):
-    for i in np.nditer(array, op_flags=['readwrite']):
-        i[...] = op(i)
-
-
-def conv(input_array, output_array, filter_weights, filter_bias, stride):
-    reshaped_input_array = input_array.copy()
-    reshaped_filter_weights = filter_weights.copy()
-    if reshaped_filter_weights.ndim == 2:
-        reshaped_input_array = input_array[None, :]
-    if filter_weights.ndim == 2:
-        reshaped_filter_weights = filter_weights[None, :]
-    for i in range(output_array.shape[0]):
-        for j in range(output_array.shape[1]):
-            patched_input = get_patch(reshaped_input_array, i, j, reshaped_filter_weights.shape[1], reshaped_filter_weights.shape[2], stride)
-            output_array[i, j] = (patched_input * filter_weights).sum() + filter_bias
-
-
-def get_patch(input_array, i, j, patch_height, patch_width, stride):
-    start_i = i * stride
-    start_j = j * stride
-    if input_array.ndim == 2:
-        return input_array[start_i: start_i + patch_height, start_j: start_j + patch_width]
-    elif input_array.ndim == 3:
-        return input_array[:, start_i: start_i + patch_height, start_j: start_j + patch_width]
-
-
 class Filter(object):
     def __init__(self, width, height, depth):
         self.w = np.random.uniform(-1e-4, 1e-4, [depth, height, width])
@@ -145,38 +158,6 @@ class Filter(object):
 
     def get_bias(self):
         return self.b
-
-
-def check_cnn_gradient():
-    input_array = np.array([1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 2, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 6, 7, 7, 8, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 7, 8])
-    input_array = input_array.reshape([2, 5, 5])
-
-    error_function = lambda x: x.sum()
-    cnn1 = ConvLayer(5, 5, 2, 3, 3, 2, 1, 1, SigmoidActivator(), SigmoidActivator(), 0.001)
-    cnn2 = ConvLayer(5, 5, 2, 3, 3, 1, 0, 2, SigmoidActivator(), IdentityActivator(), 0.001)
-    cnn1.forward(input_array)
-    cnn2.forward(cnn1.output)
-    delta_array = np.ones(cnn2.output.shape)
-    cnn2.backward(delta_array)
-    cnn1.backward(cnn2.delta_array)
-
-    epsilon = 0.00001
-    for cnn in [cnn1, cnn2]:
-        for f in range(cnn.filer_number):
-            a_filter = cnn.filters[f]
-            for d in range(a_filter.w.shape[0]):
-                for i in range(a_filter.w.shape[1]):
-                    for j in range(a_filter.w.shape[2]):
-                        a_filter.w[d][i][j] += epsilon
-                        cnn1.forward(input_array)
-                        cnn2.forward(cnn1.output)
-                        error1 = error_function(cnn2.output)
-                        a_filter.w[d][i][j] -= epsilon * 2
-                        cnn1.forward(input_array)
-                        cnn2.forward(cnn1.output)
-                        error2 = error_function(cnn2.output)
-                        expected_grad = (error1 - error2) / (2 * epsilon)
-                        print('expected grad: ', expected_grad, ' actual grad: ', a_filter.w_grad[d][i][j])
 
 
 class MaxPoolingLayer(object):
@@ -216,17 +197,36 @@ class MaxPoolingLayer(object):
                     self.delta_array[d, i * self.stride + m, j * self.stride + n] = sensitivity_array[d, i, j]
 
 
-def get_max_index(input_array):
-    index_i = 0
-    index_j = 0
-    max_value = input_array[0, 0]
-    for i in range(input_array.shape[0]):
-        for j in range(input_array.shape[1]):
-            if input_array[i, j] > max_value:
-                max_value = input_array[i, j]
-                index_i = i
-                index_j = j
-    return index_i, index_j
+def check_cnn_gradient():
+    input_array = np.array([1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 2, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 6, 7, 7, 8, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 7, 8])
+    input_array = input_array.reshape([2, 5, 5])
+
+    error_function = lambda x: x.sum()
+    cnn1 = ConvLayer(5, 5, 2, 3, 3, 2, 1, 1, SigmoidActivator(), SigmoidActivator(), 0.001)
+    cnn2 = ConvLayer(5, 5, 2, 3, 3, 1, 0, 2, SigmoidActivator(), IdentityActivator(), 0.001)
+    cnn1.forward(input_array)
+    cnn2.forward(cnn1.output)
+    delta_array = np.ones(cnn2.output.shape)
+    cnn2.backward(delta_array)
+    cnn1.backward(cnn2.delta_array)
+
+    epsilon = 0.00001
+    for cnn in [cnn1, cnn2]:
+        for f in range(cnn.filer_number):
+            a_filter = cnn.filters[f]
+            for d in range(a_filter.w.shape[0]):
+                for i in range(a_filter.w.shape[1]):
+                    for j in range(a_filter.w.shape[2]):
+                        a_filter.w[d][i][j] += epsilon
+                        cnn1.forward(input_array)
+                        cnn2.forward(cnn1.output)
+                        error1 = error_function(cnn2.output)
+                        a_filter.w[d][i][j] -= epsilon * 2
+                        cnn1.forward(input_array)
+                        cnn2.forward(cnn1.output)
+                        error2 = error_function(cnn2.output)
+                        expected_grad = (error1 - error2) / (2 * epsilon)
+                        print('expected grad: ', expected_grad, ' actual grad: ', a_filter.w_grad[d][i][j])
 
 
 if __name__ == '__main__':
