@@ -147,30 +147,37 @@ class Filter(object):
         return self.b
 
 
-def check_single_cnn_gradient():
+def check_cnn_gradient():
     input_array = np.array([1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 2, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 6, 7, 7, 8, 34, 6, 7, 7, 8, 1, 2, 3, 4, 5, 3, 2, 3, 4, 5, 6, 7, 8])
     input_array = input_array.reshape([2, 5, 5])
 
     error_function = lambda x: x.sum()
+    cnn1 = ConvLayer(5, 5, 2, 3, 3, 2, 1, 1, SigmoidActivator(), SigmoidActivator(), 0.001)
+    cnn2 = ConvLayer(5, 5, 2, 3, 3, 1, 0, 2, SigmoidActivator(), IdentityActivator(), 0.001)
+    cnn1.forward(input_array)
+    cnn2.forward(cnn1.output)
+    delta_array = np.ones(cnn2.output.shape)
+    cnn2.backward(delta_array)
+    cnn1.backward(cnn2.delta_array)
 
-    cnn = ConvLayer(5, 5, 2, 3, 3, 1, 0, 2, SigmoidActivator(), IdentityActivator(), 0.001)
-    cnn.forward(input_array)
-    delta_array = np.ones(cnn.output.shape)
-    cnn.backward(delta_array)
-    epsilon = 0.0001
-    for f in range(cnn.filer_number):
-        aFilter = cnn.filters[f]
-        for d in range(aFilter.w.shape[0]):
-            for i in range(aFilter.w.shape[1]):
-                for j in range(aFilter.w.shape[2]):
-                    aFilter.w[d][i][j] += epsilon
-                    cnn.forward(input_array)
-                    error1 = error_function(cnn.output)
-                    aFilter.w[d][i][j] -= epsilon * 2
-                    cnn.forward(input_array)
-                    error2 = error_function(cnn.output)
-                    expected_grad = (error1 - error2) / (2 * epsilon)
-                    print('expected grad: ', expected_grad, ' actual grad: ', aFilter.w_grad[d][i][j])
+    epsilon = 0.00001
+    for cnn in [cnn1, cnn2]:
+        for f in range(cnn.filer_number):
+            a_filter = cnn.filters[f]
+            for d in range(a_filter.w.shape[0]):
+                for i in range(a_filter.w.shape[1]):
+                    for j in range(a_filter.w.shape[2]):
+                        a_filter.w[d][i][j] += epsilon
+                        cnn1.forward(input_array)
+                        cnn2.forward(cnn1.output)
+                        error1 = error_function(cnn2.output)
+                        a_filter.w[d][i][j] -= epsilon * 2
+                        cnn1.forward(input_array)
+                        cnn2.forward(cnn1.output)
+                        error2 = error_function(cnn2.output)
+                        expected_grad = (error1 - error2) / (2 * epsilon)
+                        print('expected grad: ', expected_grad, ' actual grad: ', a_filter.w_grad[d][i][j])
+
 
 if __name__ == '__main__':
-    check_single_cnn_gradient()
+    check_cnn_gradient()
