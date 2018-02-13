@@ -1,6 +1,5 @@
 from fc import SigmoidActivator
 import numpy as np
-from functools import reduce
 
 
 class TanhActivator(object):
@@ -98,14 +97,12 @@ class LstmLayer(object):
 
             delta_h_t = delta_h_list[t]
             tanh_c = self.output_activator.forward(c_t)
-
             delta_o_t = delta_h_t * tanh_c * self.gate_activator.backward(o_t)
             delta_i_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * ct_t * self.gate_activator.backward(i_t)
             delta_f_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * c_t_previous * self.gate_activator.backward(f_t)
             delta_ct_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * i_t * self.output_activator.backward(ct_t)
 
-            delta_h_t_previous = np.dot(self.woh.T, delta_o_t) + np.dot(self.wfh.T, delta_f_t) + \
-                                 np.dot(self.wih.T, delta_i_t) + np.dot(self.wch.T, delta_ct_t)
+            delta_h_t_previous = np.dot(self.woh.T, delta_o_t) + np.dot(self.wfh.T, delta_f_t) + np.dot(self.wih.T, delta_i_t) + np.dot(self.wch.T, delta_ct_t)
 
             delta_o_list[t] = delta_o_t
             delta_i_list[t] = delta_i_t
@@ -118,7 +115,6 @@ class LstmLayer(object):
         self.wih_grad, self.wix_grad, self.bi_grad = self.init_grad_mat()
         self.woh_grad, self.wox_grad, self.bo_grad = self.init_grad_mat()
         self.wch_grad, self.wcx_grad, self.bc_grad = self.init_grad_mat()
-
         for t in range(self.times, 0, -1):
             delta_o_t = delta_o_list[t]
             delta_i_t = delta_i_list[t]
@@ -126,6 +122,7 @@ class LstmLayer(object):
             delta_ct_t = delta_ct_list[t]
             h_t_previous = self.h_list[t - 1]
             input_t = self.input_list[t]
+            print(t, np.dot(delta_f_t, h_t_previous.T))
 
             self.wfh_grad += np.dot(delta_f_t, h_t_previous.T)
             self.wfx_grad += np.dot(delta_f_t, input_t.T)
@@ -139,6 +136,7 @@ class LstmLayer(object):
             self.wch_grad += np.dot(delta_ct_t, h_t_previous.T)
             self.wcx_grad += np.dot(delta_ct_t, input_t.T)
             self.bc_grad += delta_ct_t
+        print(self.wfh_grad)
 
     def init_delta(self):
         delta_list = []
