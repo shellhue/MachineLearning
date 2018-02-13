@@ -226,10 +226,9 @@ def check_cnn_gradient():
                         cnn2.forward(cnn1.output)
                         error2 = error_function(cnn2.output)
                         expected_grad = (error1 - error2) / (2 * epsilon)
+                        a_filter.w[d][i][j] += epsilon
                         print('expected grad: ', expected_grad, ' actual grad: ', a_filter.w_grad[d][i][j])
 
 
 if __name__ == '__main__':
-    a = np.array([[1, 3, 6, 78], [3, 89, 3, 5]])
-    i, j = get_max_index(a)
-    print(i, j)
+    check_cnn_gradient()

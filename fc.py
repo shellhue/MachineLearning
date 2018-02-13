@@ -109,6 +109,7 @@ def single_fc_layer_gradient_check():
             layer.forward(input)
             error2 = error_fuction(layer.output)
             expected_gradient = (error1 - error2) / (2 * epsilon)
+            layer.w[i][j] += epsilon
             print('expected gradient: %f, actual: %f' % (expected_gradient, layer.w_grad[i][j]))
 
 
