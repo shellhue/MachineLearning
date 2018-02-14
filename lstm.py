@@ -41,8 +41,8 @@ class LstmLayer(object):
         return state_list
 
     def init_weights_mat(self):
-        mat_h = np.random.uniform(-1e-1, 1e-1, [self.output_size, self.output_size])
-        mat_x = np.random.uniform(-1e-1, 1e-1, [self.output_size, self.input_size])
+        mat_h = np.random.uniform(-1e-2, 1e-2, [self.output_size, self.output_size])
+        mat_x = np.random.uniform(-1e-2, 1e-2, [self.output_size, self.input_size])
         b = np.zeros([self.output_size, 1])
         return mat_h, mat_x, b
 
@@ -98,8 +98,8 @@ class LstmLayer(object):
             delta_h_t = delta_h_list[t]
             tanh_c = self.output_activator.forward(c_t)
             delta_o_t = delta_h_t * tanh_c * self.gate_activator.backward(o_t)
-            delta_i_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * ct_t * self.gate_activator.backward(i_t)
             delta_f_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * c_t_previous * self.gate_activator.backward(f_t)
+            delta_i_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * ct_t * self.gate_activator.backward(i_t)
             delta_ct_t = delta_h_t * o_t * (1 - tanh_c * tanh_c) * i_t * self.output_activator.backward(ct_t)
 
             delta_h_t_previous = np.dot(self.woh.T, delta_o_t) + np.dot(self.wfh.T, delta_f_t) + np.dot(self.wih.T, delta_i_t) + np.dot(self.wch.T, delta_ct_t)
@@ -109,7 +109,6 @@ class LstmLayer(object):
             delta_f_list[t] = delta_f_t
             delta_ct_list[t] = delta_ct_t
             delta_h_list[t - 1] = delta_h_t_previous
-
         # 计算梯度
         self.wfh_grad, self.wfx_grad, self.bf_grad = self.init_grad_mat()
         self.wih_grad, self.wix_grad, self.bi_grad = self.init_grad_mat()
@@ -122,8 +121,6 @@ class LstmLayer(object):
             delta_ct_t = delta_ct_list[t]
             h_t_previous = self.h_list[t - 1]
             input_t = self.input_list[t]
-            print(t, np.dot(delta_f_t, h_t_previous.T))
-
             self.wfh_grad += np.dot(delta_f_t, h_t_previous.T)
             self.wfx_grad += np.dot(delta_f_t, input_t.T)
             self.bf_grad += delta_f_t
@@ -136,7 +133,6 @@ class LstmLayer(object):
             self.wch_grad += np.dot(delta_ct_t, h_t_previous.T)
             self.wcx_grad += np.dot(delta_ct_t, input_t.T)
             self.bc_grad += delta_ct_t
-        print(self.wfh_grad)
 
     def init_delta(self):
         delta_list = []
@@ -174,8 +170,11 @@ class LstmLayer(object):
 def lstm_gradient_check():
 
     def error_function(x):
+        # for i in range(x.shape[0]):
+        #     for j in range(x.shape[1]):
+        #         a = i * x.shape[1] + j + 1
+        #         x[i, j] *= (i * x.shape[1] + j + 1)
         return x.sum()
-
     x1 = np.array([[2], [4], [10], [10], [10]])
     x2 = np.array([[8], [6], [5], [10], [10]])
     x3 = np.array([[18], [13], [15], [10], [10]])
@@ -184,25 +183,25 @@ def lstm_gradient_check():
     lstm = LstmLayer(5, 3, SigmoidActivator())
     lstm.forward(x1)
     lstm.forward(x2)
-    lstm.forward(x3)
+    # lstm.forward(x3)
     lstm.backward(delta_array)
 
-    epsilon = 0.0001
+    epsilon = 0.001
     for i in range(lstm.wfh.shape[0]):
         for j in range(lstm.wfh.shape[1]):
             lstm.reset_state()
             lstm.wfh[i, j] += epsilon
             lstm.forward(x1)
             lstm.forward(x2)
-            lstm.forward(x3)
+            # lstm.forward(x3)
             err1 = error_function(lstm.h_list[-1])
             lstm.reset_state()
-            lstm.wfh[i, j] -= epsilon * 2
+            lstm.wfh[i, j] -= epsilon * 2.0
             lstm.forward(x1)
             lstm.forward(x2)
-            lstm.forward(x3)
+            # lstm.forward(x3)
             err2 = error_function(lstm.h_list[-1])
-            expected_grad = (err1 - err2) / (2 * epsilon)
+            expected_grad = (err1 - err2) / (2.0 * epsilon)
             lstm.wfh[i, j] += epsilon
             print('expected wfh grad: ', expected_grad, ' actual wfh grad: ', lstm.wfh_grad[i, j])
 
